@@ -342,8 +342,11 @@ function getSlotGridInfo(slot, slotGrids, slotGridMeta) {
 }
 
 export default function CraftProfitPage() {
-  const [setId, setSetId] = useState(SORTED_SETS[0]?.id || "");
-  const selectedSet = useMemo(() => SORTED_SETS.find((s) => s.id === setId) || SORTED_SETS[0], [setId]);
+  const [setId, setSetId] = useState("");
+  const selectedSet = useMemo(
+  () => SORTED_SETS.find((s) => s.id === setId) || null,
+  [setId]
+);
   
 const slotItemMap = useMemo(() => {
   const map = {};
@@ -400,8 +403,12 @@ const crystalByEquipLevel = useMemo(() => {
       const itemNames = Array.isArray(s.items)
         ? s.items.map((it) => String(it.name || "").toLowerCase()).join(" ")
         : "";
+      const equipLevelText = String(s.equipLevel ?? "");
+      const itemEquipLevels = Array.isArray(s.items)
+        ? s.items.map((it) => String(it.equipLevel ?? "")).join(" ")
+        : "";
 
-      if (!(top.includes(q) || itemNames.includes(q))) continue;
+      if (!(top.includes(q) || itemNames.includes(q) || equipLevelText.includes(q) || itemEquipLevels.includes(q))) continue;
 
       if (Array.isArray(s.items) && s.items.length > 1) groupedMatches.push(s);
       else singleMatches.push(s);
@@ -548,7 +555,7 @@ setUnitCostMap(nextMap);
               <input
                 type="text"
                 value={setQuery}
-                placeholder="装備セット名で検索"
+                placeholder="装備名 or レベルで検索"
                 onFocus={() => setOpenSetList(true)}
                 onChange={(e) => {
                   setSetQuery(e.target.value);

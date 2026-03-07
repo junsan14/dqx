@@ -13,6 +13,16 @@ export const TOOLS_BY_CRAFT = {
     { id: "miracle_hammer", name: "奇跡の鍛冶ハンマー", defaultPrice: 430000 },
     { id: "light_hammer", name: "光の鍛冶ハンマー", defaultPrice: 450000 },
   ],
+  防具鍛冶: [
+    { id: "none", name: "選択なし", defaultPrice: 0 },
+    { id: "copper_hammer", name: "銅の鍛冶ハンマー", defaultPrice: 120000 },
+    { id: "iron_hammer", name: "鉄の鍛冶ハンマー", defaultPrice: 120000 },
+    { id: "silver_hammer", name: "銀の鍛冶ハンマー", defaultPrice: 120000 },
+    { id: "platina_hammer", name: "プラチナ鍛冶ハンマー", defaultPrice: 120000 },
+    { id: "super_hammer", name: "超鍛冶ハンマー", defaultPrice: 120000 },
+    { id: "miracle_hammer", name: "奇跡の鍛冶ハンマー", defaultPrice: 430000 },
+    { id: "light_hammer", name: "光の鍛冶ハンマー", defaultPrice: 450000 },
+  ],
   木工: [
     { id: "none", name: "選択なし", defaultPrice: 0 },
     { id: "copper_wood", name: "銅の木工刀", defaultPrice: 120000 },

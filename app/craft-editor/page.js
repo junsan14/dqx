@@ -129,7 +129,7 @@ const WEAPON_DEFAULT_JOBS = {
 
 // ★防具：装備可能タイプ（グループ）→ デフォルト職業
 const ARMOR_GROUP_DEFAULT_JOBS = {
-  "戦士系": ["戦士","パラディン","魔法戦士","魔剣士","ガーディアン"],
+  "戦士系": ["戦士","パラディン","魔法戦士(スキル)","魔剣士","ガーディアン"],
   "僧侶・魔法使い系": ["僧侶","魔法使い","賢者","占い師","天地雷鳴士","デスマスター","竜術士","隠者"],
   "武闘家系": ["武闘家","バトルマスター","まもの使い","踊り子"],
   "盗賊系": ["盗賊","魔法戦士","どうぐ使い","海賊"],
@@ -260,9 +260,9 @@ function ensureGridSize(curGrid, rowsCount, colsCount) {
 const GRID_TYPE_PRESETS = {
   // 防具鍛冶
   "鎧頭": { rows: 2, cols: 2, disabledCells: [] },
-  "鎧上": { rows: 3, cols: 3, disabledCells: [] },
-  "鎧下": { rows: 3, cols: 2, disabledCells: [] },
-  "鎧腕": { rows: 2, cols: 3, disabledCells: [] },
+  "鎧上": { rows: 3, cols: 2 , disabledCells: [] },
+  "鎧下": { rows: 4, cols: 2, disabledCells: [] },
+  "鎧腕": { rows: 3, cols: 1, disabledCells: [] },
   "鎧足": { rows: 3, cols: 2, disabledCells: [[0,0],[1,0]] },
 
   // 裁縫
@@ -284,16 +284,7 @@ const GRID_TYPE_PRESETS = {
   "ハンマー": { rows: 3, cols: 2, disabledCells: [] },
   "ツメ": { rows: 2, cols: 2, disabledCells: [] },
   "ムチ": { rows: 4, cols: 2, disabledCells: [[3,1]] },
-  "ブーメラン": {
-    rows: 3,
-    cols: 3,
-    disabledCells: [
-      [0, 1],
-      [1, 0],
-      [1, 2],
-      [2, 1],
-    ],
-  },
+  "ブーメラン": {rows: 3,cols: 2,disabledCells: [[1, 0]]},
   "スティック": { rows: 2, cols: 1, disabledCells: [] },
   "両手杖": { rows: 3, cols: 1, disabledCells: [] },
   "棍": { rows: 3, cols: 2, disabledCells: [] },
@@ -514,6 +505,25 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 
+
+const THEME = {
+  bg: "var(--bg, #0f172a)",
+  card: "var(--card, #0f172a)",
+  text: "var(--text, #e2e8f0)",
+  border: "var(--border, #334155)",
+  muted: "var(--muted, #94a3b8)",
+  soft: "var(--soft, #111827)",
+  active: "var(--active, #1e293b)",
+  activeBorder: "var(--activeBorder, #818cf8)",
+  inputBg: "var(--inputBg, #0b1220)",
+  chipBg: "var(--chipBg, #111827)",
+  preBg: "var(--preBg, #000000)",
+  preText: "var(--preText, #e5e7eb)",
+  dangerBg: "var(--dangerBg, #3f1d1d)",
+  dangerBorder: "var(--dangerBorder, #b91c1c)",
+  dangerText: "var(--dangerText, #fecaca)",
+};
+
 export default function Page() {
   const fileRef = useRef(null);
 
@@ -627,7 +637,38 @@ export default function Page() {
     const q = query.trim().toLowerCase();
     const grouped = buildGroupedRows(rows);
     if (!q) return grouped;
-    return grouped.filter((entry) => (entry.searchText || "").toLowerCase().includes(q));
+
+    return grouped.filter((entry) => {
+      const baseText = (entry.searchText || "").toLowerCase();
+
+      if (entry.__kind === "group") {
+        const equipLevels = Array.isArray(entry.items)
+          ? entry.items.map((it) => String(it.equipLevel ?? "")).join(" ")
+          : "";
+        const craftLevels = Array.isArray(entry.items)
+          ? entry.items.map((it) => String(it.craftLevel ?? "")).join(" ")
+          : "";
+        const groupEquipLevel = String(entry.equipLevel ?? "");
+        const groupCraftLevel = String(entry.craftLevel ?? "");
+
+        return (
+          baseText.includes(q) ||
+          groupEquipLevel.includes(q) ||
+          groupCraftLevel.includes(q) ||
+          equipLevels.includes(q) ||
+          craftLevels.includes(q)
+        );
+      }
+
+      const rowEquipLevel = String(entry.row?.equipLevel ?? "");
+      const rowCraftLevel = String(entry.row?.craftLevel ?? "");
+
+      return (
+        baseText.includes(q) ||
+        rowEquipLevel.includes(q) ||
+        rowCraftLevel.includes(q)
+      );
+    });
   }, [rows, query]);
   const gridTypeOptionsForSelectedRow = useMemo(() => {
     const itemKind = (selectedRow?.itemKind ?? "").trim();
@@ -673,31 +714,44 @@ export default function Page() {
     return arr.map((x) => (x ?? "").toString()).filter(Boolean);
   }, [selectedRow]);
 
-    useEffect(() => {
-      if (!selectedRow) {
-        setGridRows(1);
-        setGridCols(1);
-        setGrid2d([[""]]);
-        return;
-      }
+useEffect(() => {
+  if (!selectedRow) {
+    setGridRows(1);
+    setGridCols(1);
+    setGrid2d([[""]]);
+    return;
+  }
 
-      const colsHint = Number(selectedRow.slotGridCols ?? 0) || 0;
-      const gridLike = safeJsonParse(selectedRow.slotGridJson, null);
-      const norm = normalizeGrid(gridLike, colsHint);
+  const gridType = (selectedRow.slotGridType ?? "").trim();
+  const preset = GRID_TYPE_PRESETS[gridType] ?? null;
 
-      // ★ デフォルト1マス
-      const rows = norm.rows > 0 ? norm.rows : 1;
-      const cols = norm.cols > 0 ? norm.cols : 1;
+  const colsHintFromRow = Number(selectedRow.slotGridCols ?? 0) || 0;
+  const colsHint = preset?.cols ?? colsHintFromRow;
 
-      const grid =
-        norm.rows > 0 && norm.cols > 0
-          ? norm.grid
-          : [[""]];
+  const gridLike = safeJsonParse(selectedRow.slotGridJson, null);
+  const norm = normalizeGrid(gridLike, colsHint);
 
-      setGridRows(rows);
-      setGridCols(cols);
-      setGrid2d(grid);
-    }, [selectedRow?.__key]);
+  // まず preset を優先、なければ既存grid、最後に 1x1
+  const rows =
+    preset?.rows ??
+    (norm.rows > 0 ? norm.rows : 1);
+
+  const cols =
+    preset?.cols ??
+    (norm.cols > 0 ? norm.cols : 1);
+
+  // 既存gridがあればそれを使う。足りない分は補完
+  const baseGrid =
+    norm.rows > 0 && norm.cols > 0
+      ? norm.grid
+      : [];
+
+  const resized = ensureGridSize(baseGrid, rows, cols);
+
+  setGridRows(rows);
+  setGridCols(cols);
+  setGrid2d(resized);
+}, [selectedRow?.__key]);
 
   function setSelectedRowPatch(patch) {
     if (!selectedKey) return;
@@ -1227,7 +1281,7 @@ function deleteCurrentGroup() {
 }
 
   return (
-    <div style={page}>
+    <div style={{ ...page, background: THEME.bg, color: THEME.text }}>
       <h1 style={{ margin: 0, fontSize: 22 }}>Craft CSV Editor（装備可能タイプ対応）</h1>
 
       <div style={toolbar}>
@@ -1251,7 +1305,7 @@ function deleteCurrentGroup() {
           /data に保存（上書き）
         </button>
 
-        <span style={{ marginLeft: "auto", color: "#64748b", fontSize: 12 }}>rows: {rows.length}</span>
+        <span style={{ marginLeft: "auto", color: THEME.muted, fontSize: 12 }}>rows: {rows.length}</span>
       </div>
 
       {/* 新規追加 */}
@@ -1356,7 +1410,7 @@ function deleteCurrentGroup() {
               </label>
             </div>
 
-            <div style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 12 }}>
+            <div style={{ border: `1px solid ${THEME.border}`, borderRadius: 12, padding: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 8 }}>グループに入れる部位</div>
               <div style={{ display: "grid", gap: 10 }}>
                 {newGroup.members.map((member, i) => (
@@ -1386,7 +1440,7 @@ function deleteCurrentGroup() {
                 ))}
               </div>
 
-              <div style={{ marginTop: 10, color: "#64748b", fontSize: 12 }}>
+              <div style={{ marginTop: 10, color: THEME.muted, fontSize: 12 }}>
                 ※ 名前を空欄にすると、groupName から仮の装備名を自動で入れる
               </div>
             </div>
@@ -1401,7 +1455,7 @@ function deleteCurrentGroup() {
       {rows.length === 0 ? (
         <div style={empty}>
           <div style={{ fontWeight: 900 }}>使い方</div>
-          <ol style={{ marginTop: 8, color: "#475569" }}>
+          <ol style={{ marginTop: 8, color: THEME.muted }}>
             <li>craft_master.csv をアップロード or 自動ロード</li>
             <li>左から装備を選択</li>
             <li>右で編集</li>
@@ -1414,7 +1468,7 @@ function deleteCurrentGroup() {
           <div style={listWrap}>
             <div style={listHeader}>
               <input
-                placeholder="検索（名前）"
+                placeholder="検索（名前 / 装備Lv / 職人Lv）"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 style={{ ...input, width: "100%", minWidth: 0 }}
@@ -1435,13 +1489,13 @@ function deleteCurrentGroup() {
                       textAlign: "left",
                       padding: "10px 12px",
                       border: 0,
-                      borderBottom: "1px solid #f1f5f9",
-                      background: active ? "#eef2ff" : "white",
+                      borderBottom: `1px solid ${THEME.border}`,
+                      background: active ? THEME.active : THEME.card,
                       cursor: "pointer",
                     }}
                   >
                     <div style={{ fontWeight: 800, fontSize: 13 }}>{entry.label}</div>
-                    <div style={{ fontSize: 12, color: "#64748b" }}>
+                    <div style={{ fontSize: 12, color: THEME.muted }}>
                       {entry.__kind === "group"
                         ? `${entry.craftType ?? ""} / ${entry.items.map((it) => `${it.slotLabel}:${it.itemName}`).join(" / ")}`
                         : `${entry.row?.itemType ?? ""} / ${entry.row?.craftType ?? ""} / ${entry.row?.equipableType ?? ""}`}
@@ -1462,7 +1516,7 @@ function deleteCurrentGroup() {
                 <div style={card}>
                   <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
                     <div style={{ fontWeight: 900, fontSize: 16 }}>基本情報</div>
-                    <div style={{ color: "#64748b", fontSize: 12 }}>
+                    <div style={{ color: THEME.muted, fontSize: 12 }}>
                       itemId: {selectedRow?.itemId || "（自動生成）"}
                     </div>
                     <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -1483,7 +1537,7 @@ function deleteCurrentGroup() {
                   </div>
                   <label style={{ display: "inline-flex", gap: 8, alignItems: "center", marginLeft: 12 }}>
                     <input type="checkbox" checked={syncGroup} onChange={(e) => setSyncGroup(e.target.checked)} />
-                    <span style={{ fontSize: 12, color: "#475569", fontWeight: 800 }}>グループ同期</span>
+                    <span style={{ fontSize: 12, color: THEME.muted, fontWeight: 800 }}>グループ同期</span>
                   </label>
                   <div style={grid3}>
                     <FieldInput
@@ -1600,7 +1654,7 @@ function deleteCurrentGroup() {
                     if (groupedItems.length <= 1) return null;
 
                     return (
-                      <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 12 }}>
+                      <div style={{ marginTop: 14, borderTop: `1px solid ${THEME.border}`, paddingTop: 12 }}>
                         <div style={{ fontWeight: 900, marginBottom: 8 }}>セット内の装備</div>
                         <div style={{ display: "grid", gap: 8 }}>
                           {groupedItems.map((r) => {
@@ -1616,17 +1670,17 @@ function deleteCurrentGroup() {
                                   textAlign: "left",
                                   padding: "10px 12px",
                                   borderRadius: 10,
-                                  border: active ? "1px solid #6366f1" : "1px solid #e2e8f0",
-                                  background: active ? "#eef2ff" : "#fff",
+                                  border: active ? `1px solid ${THEME.activeBorder}` : `1px solid ${THEME.border}`,
+                                  background: active ? THEME.active : THEME.card,
                                   cursor: "pointer",
                                 }}
                               >
                                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
                                   <strong>{slotLabel || "部位不明"}</strong>
                                   <span>{r?.itemName ?? ""}</span>
-                                  <span style={{ color: "#64748b", fontSize: 12 }}>{r?.itemType ?? ""}</span>
+                                  <span style={{ color: THEME.muted, fontSize: 12 }}>{r?.itemType ?? ""}</span>
                                 </div>
-                                <div style={{ marginTop: 6, fontSize: 12, color: "#475569" }}>
+                                <div style={{ marginTop: 6, fontSize: 12, color: THEME.muted }}>
                                   素材: {Array.isArray(mats) && mats.length > 0
                                     ? mats.map((m) => `${m?.name ?? ""}×${m?.qty ?? ""}`).join(" / ")
                                     : "なし"}
@@ -1639,7 +1693,7 @@ function deleteCurrentGroup() {
                     );
                   })()}
 
-                  <div style={{ marginTop: 10, color: "#64748b", fontSize: 12 }}>
+                  <div style={{ marginTop: 10, color: THEME.muted, fontSize: 12 }}>
                     ※ 装備可能タイプを変えた時、jobsが空なら自動でデフォルト職業が入る
                   </div>
                 </div>
@@ -1654,7 +1708,7 @@ function deleteCurrentGroup() {
                   <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {jobs.length === 0 ? (
-                        <div style={{ color: "#64748b", fontSize: 13 }}>未設定</div>
+                        <div style={{ color: THEME.muted, fontSize: 13 }}>未設定</div>
                       ) : (
                         jobs.map((j) => (
                           <span key={j} style={chip}>
@@ -1730,7 +1784,7 @@ function deleteCurrentGroup() {
 
                   <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
                     {materials.length === 0 ? (
-                      <div style={{ color: "#64748b", fontSize: 13 }}>素材なし（必要なら追加）</div>
+                      <div style={{ color: THEME.muted, fontSize: 13 }}>素材なし（必要なら追加）</div>
                     ) : (
                       materials.map((m, i) => (
                         <div key={i} style={matRow}>
@@ -1812,7 +1866,7 @@ function deleteCurrentGroup() {
                   </div>
 
                   {gridRows === 0 || gridCols === 0 ? (
-                    <div style={{ marginTop: 10, color: "#64748b" }}>
+                    <div style={{ marginTop: 10, color: THEME.muted }}>
                       itemTypeかgridTypeを選ぶと作れる。
                     </div>
                   ) : (
@@ -1838,7 +1892,7 @@ function deleteCurrentGroup() {
                                     <input
                                       value={str(grid2d?.[r]?.[c] ?? "")}
                                       onChange={(e) => {
-                                        if (!disabled) updateGridCell(r, c, e.target.value);
+                                         updateGridCell(r, c, e.target.value);
                                       }}
                                       onPaste={(e) => {
                                         if (disabled) {
@@ -1852,12 +1906,12 @@ function deleteCurrentGroup() {
                                           handleGridPaste(r, c, t);
                                         }
                                       }}
-                                      disabled={disabled}
+                                     
                                       style={{
                                         ...cellInput,
-                                        backgroundColor: disabled ? "#e5e7eb" : "white",
-                                        color: disabled ? "#94a3b8" : "#0f172a",
-                                        cursor: disabled ? "not-allowed" : "text",
+                                        backgroundColor: disabled ? THEME.soft : THEME.inputBg,
+                                        color: disabled ? THEME.muted : THEME.text,
+                                      
                                       }}
                                     />
                                   </td>
@@ -1935,7 +1989,7 @@ function FieldSelect({ labelText, value, options, onChange, allowEmpty }) {
 /* styles */
 const page = { padding: 18, display: "grid", gap: 12, maxWidth: 1400 };
 const toolbar = { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" };
-const empty = { padding: 16, border: "1px dashed #cbd5e1", borderRadius: 12 };
+const empty = { padding: 16, border: `1px dashed ${THEME.border}`, borderRadius: 12, background: THEME.card, color: THEME.text };
 
 const layout = {
   display: "grid",
@@ -1944,13 +1998,13 @@ const layout = {
   alignItems: "start",
 };
 
-const listWrap = { border: "1px solid #e2e8f0", borderRadius: 12, overflow: "hidden", minWidth: 0 };
-const listHeader = { padding: 10, background: "#f8fafc", borderBottom: "1px solid #e2e8f0" };
+const listWrap = { border: `1px solid ${THEME.border}`, borderRadius: 12, overflow: "hidden", minWidth: 0 };
+const listHeader = { padding: 10, background: THEME.soft, borderBottom: `1px solid ${THEME.border}` };
 const listBody = { maxHeight: 680, overflow: "auto" };
 
-const card = { padding: 14, border: "1px solid #e2e8f0", borderRadius: 12, width: "100%", minWidth: 0 };
+const card = { padding: 14, border: `1px solid ${THEME.border}`, borderRadius: 12, width: "100%", minWidth: 0 };
 const cardTitle = { fontWeight: 900 };
-const hint = { marginLeft: "auto", color: "#64748b", fontSize: 12 };
+const hint = { marginLeft: "auto", color: THEME.muted, fontSize: 12 };
 
 const rowHead = { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" };
 
@@ -1960,8 +2014,8 @@ const grid3 = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(2
 const field = { display: "grid", gap: 4, minWidth: 0 };
 const fieldInline = { display: "grid", gap: 4 };
 
-const label = { fontSize: 12, color: "#64748b", fontWeight: 800 };
-const input = { padding: "8px 10px", borderRadius: 10, border: "1px solid #cbd5e1", minWidth: 0 };
+const label = { fontSize: 12, color: THEME.muted, fontWeight: 800 };
+const input = { padding: "8px 10px", borderRadius: 10, border: `1px solid ${THEME.border}`, minWidth: 0, background: THEME.inputBg, color: THEME.text };
 
 const matRow = {
   display: "grid",
@@ -1982,7 +2036,7 @@ const gridTableWrap = {
   marginTop: 12,
   width: "100%",
   overflowX: "auto",
-  border: "1px solid #e2e8f0",
+  border: `1px solid ${THEME.border}`,
   borderRadius: 12,
 };
 
@@ -1991,15 +2045,15 @@ const gridTable = { borderCollapse: "collapse", width: "max-content", minWidth: 
 const th = {
   position: "sticky",
   top: 0,
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
+  background: THEME.soft,
+  border: `1px solid ${THEME.border}`,
   padding: "8px 10px",
   textAlign: "center",
   fontWeight: 900,
   whiteSpace: "nowrap",
 };
 
-const td = { border: "1px solid #e2e8f0", padding: 6 };
+const td = { border: `1px solid ${THEME.border}`, padding: 6 };
 
 const cellInput = {
   width: 96,
@@ -2014,8 +2068,8 @@ const cellInput = {
 };
 
 const pre = {
-  background: "#0b1220",
-  color: "#e2e8f0",
+  background: THEME.preBg,
+  color: THEME.preText,
   padding: 12,
   borderRadius: 12,
   overflow: "auto",
@@ -2030,7 +2084,7 @@ const chip = {
   padding: "6px 10px",
   borderRadius: 999,
   border: "1px solid #cbd5e1",
-  background: "#f8fafc",
+  background: THEME.soft,
   fontSize: 13,
   fontWeight: 800,
 };
@@ -2048,13 +2102,13 @@ const jobPickWrap = {
   gap: 8,
   flexWrap: "wrap",
   paddingTop: 8,
-  borderTop: "1px dashed #e2e8f0",
+  borderTop: `1px dashed ${THEME.border}`,
 };
 const jobPick = {
   padding: "8px 10px",
   borderRadius: 999,
   border: "1px solid #cbd5e1",
-  background: "white",
+  background: THEME.card,
   fontSize: 13,
   fontWeight: 800,
 };
@@ -2062,7 +2116,7 @@ const miniButton = {
   padding: "6px 10px",
   borderRadius: 999,
   border: "1px solid #cbd5e1",
-  background: "white",
+  background: THEME.card,
   fontSize: 12,
   fontWeight: 800,
   cursor: "pointer",
@@ -2070,7 +2124,7 @@ const miniButton = {
 
 const activeMiniButton = {
   ...miniButton,
-  background: "#eef2ff",
+  background: THEME.active,
   border: "1px solid #6366f1",
   color: "#4338ca",
 };
@@ -2084,9 +2138,9 @@ const groupMemberRow = {
 const dangerButton = {
   padding: "6px 12px",
   borderRadius: 8,
-  border: "1px solid #ef4444",
-  background: "#fee2e2",
-  color: "#991b1b",
+  border: `1px solid ${THEME.dangerBorder}`,
+  background: THEME.dangerBg,
+  color: THEME.dangerText,
   fontWeight: 800,
   cursor: "pointer",
 };
